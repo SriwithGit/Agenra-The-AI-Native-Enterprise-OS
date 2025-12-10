@@ -27,6 +27,7 @@ const INITIAL_TENANTS: Tenant[] = [
       amountDue: 245000.00,
       nextBillingDate: '2024-04-01'
     },
+    isServiceSuspended: false,
     supportTickets: [
       { 
         id: 'TKT-2024-101', 
@@ -54,6 +55,7 @@ const INITIAL_TENANTS: Tenant[] = [
       amountDue: 512050.50,
       nextBillingDate: '2024-03-25'
     },
+    isServiceSuspended: true, // Automatically suspended due to overdue billing
     supportTickets: [
       { 
         id: 'TKT-2024-102', 
@@ -78,6 +80,31 @@ const INITIAL_TENANTS: Tenant[] = [
         createdBy: 'Rahul (Admin)'
       }
     ],
+    serviceRequests: []
+  },
+  { 
+    id: 'agenra-hq', 
+    name: 'Agenra Operations',
+    domain: 'internal.agenra.in',
+    adminEmail: 'ops@agenra.in',
+    services: [
+      ModuleType.CUSTOMER_SERVICE, 
+      ModuleType.RECRUITING, 
+      ModuleType.FINANCE, 
+      ModuleType.MARKET_RESEARCH, 
+      ModuleType.HR_INTERNAL, 
+      ModuleType.ITAM, 
+      ModuleType.USER_MANAGEMENT,
+      ModuleType.BILLING
+    ],
+    billing: {
+      accountNumber: 'INT-HQ-001',
+      status: 'active',
+      amountDue: 0,
+      nextBillingDate: '2024-04-01'
+    },
+    isServiceSuspended: false,
+    supportTickets: [],
     serviceRequests: []
   }
 ];
@@ -119,6 +146,29 @@ const INITIAL_USERS: User[] = [
     jobTitle: 'HR Success Manager',
     permissions: [ModuleType.DASHBOARD, ModuleType.HR_INTERNAL, ModuleType.RECRUITING],
     avatarColor: 'bg-purple-600'
+  },
+
+  // --- AGENRA INTERNAL OPS (TENANT USERS) ---
+  {
+    id: 'agenra-admin',
+    name: 'Sarah (Ops Director)',
+    email: 'sarah@agenra.in',
+    role: 'TENANT_ADMIN',
+    jobTitle: 'Director of Operations',
+    tenantId: 'agenra-hq',
+    permissions: [ModuleType.DASHBOARD, ModuleType.CUSTOMER_SERVICE, ModuleType.RECRUITING, ModuleType.FINANCE, ModuleType.MARKET_RESEARCH, ModuleType.HR_INTERNAL, ModuleType.ITAM, ModuleType.USER_MANAGEMENT, ModuleType.BILLING],
+    avatarColor: 'bg-indigo-500'
+  },
+  {
+    id: 'agenra-emp',
+    name: 'Dev (Product Eng)',
+    email: 'dev@agenra.in',
+    role: 'SERVICE_USER',
+    jobTitle: 'Product Engineer',
+    department: 'Engineering',
+    tenantId: 'agenra-hq',
+    permissions: [ModuleType.DASHBOARD, ModuleType.HR_INTERNAL, ModuleType.ITAM],
+    avatarColor: 'bg-slate-500'
   },
 
   // --- TENANT A USERS ---
@@ -169,7 +219,10 @@ const INITIAL_USERS: User[] = [
 
 const INITIAL_ASSETS: Asset[] = [
   { id: 'a1', tenantId: 'tenant-A', name: 'MacBook Pro 14"', serialNumber: 'C02HG5', type: 'HARDWARE', status: 'ASSIGNED', location: 'Bengaluru Office', purchaseDate: '2023-01-10', value: 169000, assignedTo: 'Aditya Raj' },
-  { id: 'a2', tenantId: 'tenant-A', name: 'Dell Monitor', serialNumber: 'DL-999', type: 'PERIPHERAL', status: 'AVAILABLE', location: 'HQ', purchaseDate: '2023-02-01', value: 25000 }
+  { id: 'a2', tenantId: 'tenant-A', name: 'Dell Monitor', serialNumber: 'DL-999', type: 'PERIPHERAL', status: 'AVAILABLE', location: 'HQ', purchaseDate: '2023-02-01', value: 25000 },
+  // Agenra HQ Assets
+  { id: 'a3', tenantId: 'agenra-hq', name: 'Mac Studio M2', serialNumber: 'AG-MS-01', type: 'HARDWARE', status: 'ASSIGNED', location: 'HQ Server Room', purchaseDate: '2023-11-15', value: 210000, assignedTo: 'Dev (Product Eng)' },
+  { id: 'a4', tenantId: 'agenra-hq', name: 'Test Device Android', serialNumber: 'AG-MOB-99', type: 'HARDWARE', status: 'AVAILABLE', location: 'QA Lab', purchaseDate: '2023-12-01', value: 35000 }
 ];
 
 // --- LOCAL STORAGE HELPERS ---
@@ -255,6 +308,7 @@ export const api = {
             adminEmail: data.admin_email || data.adminEmail,
             services: data.services,
             billing: { accountNumber: `NEW-${Date.now()}`, status: 'active', amountDue: 0, nextBillingDate: new Date().toISOString().split('T')[0] },
+            isServiceSuspended: false,
             supportTickets: [],
             serviceRequests: []
           };
@@ -326,7 +380,12 @@ export const api = {
     if (USE_MOCK) {
       return new Promise(resolve => {
         const assets = getStorage<Asset[]>(DB_KEYS.ASSETS, INITIAL_ASSETS);
-        resolve(assets.filter(a => a.tenantId === tenantId));
+        if (!tenantId) {
+           // Return ALL assets if no tenantId provided (for initial load)
+           resolve(assets);
+        } else {
+           resolve(assets.filter(a => a.tenantId === tenantId));
+        }
       });
     }
     return fetchApi<Asset[]>(`/itam/assets?tenant_id=${tenantId}`);

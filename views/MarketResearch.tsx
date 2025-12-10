@@ -1,20 +1,41 @@
+
 import React, { useState } from 'react';
-import { Search, Globe, ArrowRight, Loader2 } from 'lucide-react';
+import { Search, Globe, ArrowRight, Loader2, TrendingUp, Target, ExternalLink, Sparkles } from 'lucide-react';
 import { searchMarketData } from '../services/geminiService';
 import { GroundingChunk } from '../types';
+
+const SUGGESTIONS = [
+  "Top Fintech competitors in India 2025",
+  "SaaS market trends for MSMEs in India",
+  "Growth of AI startups in Bengaluru",
+  "Remote work policy trends India"
+];
 
 const MarketResearch: React.FC = () => {
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ text: string, sources: GroundingChunk[] } | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+  const handleSearch = async (e?: React.FormEvent, customQuery?: string) => {
+    if (e) e.preventDefault();
+    const q = customQuery || query;
+    if (!q.trim()) return;
+
+    // Update input if using suggestion
+    if (customQuery) setQuery(customQuery);
 
     setLoading(true);
+    setResult(null); // Clear previous result
     try {
-      const data = await searchMarketData(`Act as a senior market researcher. Provide a detailed analysis for: ${query}. Focus on competitors, trends, and market size.`);
+      const data = await searchMarketData(`
+        Context: You are a strategic advisor for the Indian Market.
+        Task: Conduct deep market research on: "${q}".
+        Requirements:
+        1. List key competitors (if applicable).
+        2. Identify specific trends with numbers/percentages if available.
+        3. Cite sources clearly using the groundings provided.
+        4. Focus on data relevant to Indian businesses.
+      `);
       setResult(data);
     } catch (err) {
       console.error(err);
@@ -24,60 +45,107 @@ const MarketResearch: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700">
-        <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Market Research Intelligence</h2>
-        <p className="text-slate-400 mb-6">Deep dive into market trends, competitor analysis, and consumer behavior using real-time Google Search data.</p>
-        
-        <form onSubmit={handleSearch} className="relative">
+    <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-12">
+      <div className="text-center space-y-4">
+        <h1 className="text-4xl font-extrabold bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent flex items-center justify-center gap-3">
+          <Globe size={40} className="text-purple-400" />
+          Market Intelligence Engine
+        </h1>
+        <p className="text-slate-400 max-w-2xl mx-auto text-lg">
+          Leverage real-time Google Search grounding to analyze competitors, uncover trends, and validate business strategies in the Indian market.
+        </p>
+      </div>
+
+      {/* Search Section */}
+      <div className="bg-slate-800/50 p-8 rounded-2xl border border-slate-700 shadow-xl backdrop-blur-sm">
+        <form onSubmit={(e) => handleSearch(e)} className="relative mb-6">
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="E.g., Global EV battery market trends 2024..."
-            className="w-full bg-slate-900 border border-slate-700 rounded-xl py-4 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all placeholder:text-slate-600"
+            placeholder="E.g., Competitive landscape for EdTech in India..."
+            className="w-full bg-slate-900 border border-slate-700 rounded-xl py-5 pl-14 pr-36 text-white text-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all placeholder:text-slate-600 shadow-inner"
           />
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-500" size={20} />
+          <Search className="absolute left-5 top-1/2 transform -translate-y-1/2 text-slate-500" size={24} />
           <button 
             type="submit"
-            disabled={loading}
-            className="absolute right-2 top-2 bottom-2 bg-purple-600 hover:bg-purple-500 text-white px-6 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            disabled={loading || !query.trim()}
+            className="absolute right-3 top-3 bottom-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-6 rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg"
           >
-            {loading ? <Loader2 className="animate-spin" size={18} /> : <ArrowRight size={18} />}
+            {loading ? <Loader2 className="animate-spin" size={20} /> : <>Research <ArrowRight size={20} /></>}
           </button>
         </form>
+
+        {/* Suggestions */}
+        <div className="flex flex-wrap gap-2 justify-center items-center">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+            <TrendingUp size={12} /> Trending:
+          </span>
+          {SUGGESTIONS.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => handleSearch(undefined, s)}
+              disabled={loading}
+              className="px-3 py-1.5 rounded-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 text-slate-300 text-xs transition-all hover:text-white hover:border-purple-500/50"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
 
+      {/* Results Section */}
       {result && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
-            <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
-              <Globe className="text-blue-400" size={20} />
-              Research Summary
-            </h3>
-            <div className="prose prose-invert max-w-none text-slate-300 leading-relaxed whitespace-pre-line">
-              {result.text}
+        <div className="space-y-6 animate-fade-in-up">
+          {/* Main Analysis Card */}
+          <div className="bg-slate-800 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-700 bg-slate-900/50 flex justify-between items-center">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Sparkles className="text-purple-400" size={20} />
+                Strategic Analysis
+              </h3>
+              <div className="text-xs text-slate-500 font-mono bg-slate-900 px-2 py-1 rounded border border-slate-800">
+                Generated by Gemini 2.5
+              </div>
+            </div>
+            <div className="p-8">
+              <div className="prose prose-invert prose-lg max-w-none text-slate-300 leading-relaxed whitespace-pre-line">
+                {result.text}
+              </div>
             </div>
           </div>
 
+          {/* Sources Grid */}
           {result.sources.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {result.sources.map((source, idx) => {
-                const web = source.web;
-                if (!web || !web.uri || !web.title) return null;
-                return (
-                  <a 
-                    key={idx} 
-                    href={web.uri} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="block p-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition-all hover:-translate-y-1 hover:shadow-lg group"
-                  >
-                    <div className="text-xs text-slate-500 mb-1 truncate">{new URL(web.uri).hostname}</div>
-                    <div className="font-medium text-blue-400 group-hover:text-blue-300 truncate">{web.title}</div>
-                  </a>
-                );
-              })}
+            <div>
+              <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                <Target size={16} /> Verified Sources
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {result.sources.map((source, idx) => {
+                  const web = source.web;
+                  if (!web || !web.uri || !web.title) return null;
+                  return (
+                    <a 
+                      key={idx} 
+                      href={web.uri} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="block p-4 bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-blue-500/50 rounded-xl transition-all group relative overflow-hidden h-full flex flex-col"
+                    >
+                      <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ExternalLink size={14} className="text-blue-400" />
+                      </div>
+                      <div className="text-xs font-bold text-blue-400 mb-2 truncate bg-blue-500/10 w-fit px-2 py-0.5 rounded">
+                        {new URL(web.uri).hostname.replace('www.', '')}
+                      </div>
+                      <div className="font-medium text-slate-200 text-sm line-clamp-2 group-hover:text-blue-100 transition-colors flex-1">
+                        {web.title}
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

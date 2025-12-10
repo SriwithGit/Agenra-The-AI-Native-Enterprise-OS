@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Tenant, ModuleType, ServiceRequest } from '../types';
-import { CreditCard, CheckCircle, AlertTriangle, Plus, Trash2, Clock, Check, X } from 'lucide-react';
+import { CreditCard, CheckCircle, AlertTriangle, Plus, Trash2, Clock, Check, X, PauseCircle } from 'lucide-react';
 
 interface BillingProps {
   tenant: Tenant;
@@ -15,6 +15,8 @@ const ALL_SERVICES = [
   { id: ModuleType.FINANCE, label: 'Finance' },
   { id: ModuleType.MARKET_RESEARCH, label: 'Market Research' },
   { id: ModuleType.HR_INTERNAL, label: 'HR Internal' },
+  { id: ModuleType.ITAM, label: 'IT Asset Management' },
+  { id: ModuleType.USER_MANAGEMENT, label: 'User Management' },
 ];
 
 const Billing: React.FC<BillingProps> = ({ tenant, onPayBill, onRequestServiceChange }) => {
@@ -47,6 +49,19 @@ const Billing: React.FC<BillingProps> = ({ tenant, onPayBill, onRequestServiceCh
         <h2 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">Billing & Services</h2>
         <p className="text-slate-400 mt-2">Manage your subscription, invoices, and active services.</p>
       </div>
+
+      {tenant.isServiceSuspended && (
+         <div className="bg-red-500/10 border border-red-500/50 text-red-400 p-6 rounded-2xl flex items-start gap-4">
+            <PauseCircle size={32} className="shrink-0 mt-1" />
+            <div>
+               <h3 className="font-bold text-lg text-white">Services Halted</h3>
+               <p className="text-sm mt-1">
+                  Your services have been automatically suspended due to overdue payment. 
+                  Please settle the outstanding invoice below to immediately resume access to all modules.
+               </p>
+            </div>
+         </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Invoice Card */}
@@ -94,7 +109,7 @@ const Billing: React.FC<BillingProps> = ({ tenant, onPayBill, onRequestServiceCh
         </div>
 
         {/* Service Management */}
-        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-8">
+        <div className={`bg-slate-800 rounded-2xl border border-slate-700 p-8 ${tenant.isServiceSuspended ? 'opacity-70 pointer-events-none' : ''}`}>
           <h3 className="text-xl font-bold text-white mb-6">Subscription Manager</h3>
           <div className="space-y-3">
              {ALL_SERVICES.map(service => {

@@ -5,6 +5,12 @@ import { base64ToUint8Array, decodeAudioData } from "../utils/audioUtils";
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
 
+// Helper to strip markdown formatting from JSON responses
+const cleanJson = (text: string): string => {
+  if (!text) return "{}";
+  return text.replace(/```json/g, '').replace(/```/g, '').trim();
+};
+
 export const searchMarketData = async (query: string): Promise<{ text: string, sources: GroundingChunk[] }> => {
   try {
     const response = await ai.models.generateContent({
@@ -129,7 +135,7 @@ export const evaluateCandidate = async (
 
     const text = response.text;
     if (!text) throw new Error("No response from AI");
-    return JSON.parse(text) as CandidateEvaluation;
+    return JSON.parse(cleanJson(text)) as CandidateEvaluation;
 
   } catch (error) {
     console.error("Evaluation error:", error);
@@ -183,7 +189,7 @@ export const parseResume = async (resumeText: string): Promise<ParsedResume> => 
 
     const text = response.text;
     if (!text) throw new Error("No response from AI");
-    return JSON.parse(text) as ParsedResume;
+    return JSON.parse(cleanJson(text)) as ParsedResume;
   } catch (error) {
     console.error("Parse resume error:", error);
     return {
@@ -272,7 +278,7 @@ export const generateApplicationMaterials = async (
 
     const text = response.text;
     if (!text) throw new Error("No response");
-    return JSON.parse(text);
+    return JSON.parse(cleanJson(text));
 
   } catch (error) {
     console.error("Application generation error:", error);
@@ -384,7 +390,7 @@ export const parseFinancialLedger = async (fileContent: string, viewMode: 'quart
       }
     });
 
-    return JSON.parse(response.text || "[]") as LedgerItem[];
+    return JSON.parse(cleanJson(response.text || "[]")) as LedgerItem[];
   } catch (error) {
     console.error("Ledger parse error:", error);
     return [];
@@ -452,7 +458,7 @@ export const generateFinancialForecast = async (currentData: any[], timeframe: s
 
     const text = response.text;
     if (!text) throw new Error("Empty response from model");
-    return JSON.parse(text) as ForecastResult;
+    return JSON.parse(cleanJson(text)) as ForecastResult;
   } catch (error) {
     console.error("Forecast error:", error);
     throw error;
@@ -514,12 +520,38 @@ export const transcribeAudioNote = async (audioBase64: string): Promise<string> 
 export const quickSummarize = async (text: string): Promise<string> => {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-flash-lite-latest", // Mapped alias
+      model: "gemini-flash-lite-latest", 
       contents: `Summarize this in 1 short sentence: ${text}`,
     });
     return response.text || "";
   } catch (error) {
     console.error("Summarize error:", error);
     return "Summary unavailable.";
+  }
+};
+
+// 4. Generate IT Policy (Gemini 2.5 Flash)
+export const generateITPolicy = async (topic: string): Promise<string> => {
+  try {
+    const prompt = `
+      Act as a Chief Information Security Officer (CISO) for an Indian Mid-Market Enterprise.
+      Draft a formal, comprehensive IT Policy for: "${topic}".
+
+      Requirements:
+      1. Professional, legalistic but readable tone.
+      2. Structure: Purpose, Scope, Policy Guidelines, Enforcement, and Compliance.
+      3. Local Context: Mention alignment with the Information Technology Act, 2000 (India) and Data Privacy Rules where relevant.
+      4. Format: Plain text with clear section headers. Keep it under 300 words for readability.
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    return response.text || "Failed to generate policy.";
+  } catch (error) {
+    console.error("Policy generation error:", error);
+    return "Error generating policy. Please try again.";
   }
 };

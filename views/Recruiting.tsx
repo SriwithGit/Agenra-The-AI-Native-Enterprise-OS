@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Briefcase, UserCheck, Phone, ChevronRight, Loader2, Sparkles, Mail, Upload, FileText, X, Building2, Filter, MapPin, Mic, MicOff, Zap, Play, User, ExternalLink, CheckCircle, FileSignature, DollarSign, Calendar, ArrowRight, IndianRupee } from 'lucide-react';
+import { Plus, Briefcase, UserCheck, Phone, ChevronRight, Loader2, Sparkles, Mail, Upload, FileText, X, Building2, Filter, MapPin, Mic, MicOff, Zap, Play, User, ExternalLink, CheckCircle, FileSignature, DollarSign, Calendar, ArrowRight, IndianRupee, MessageSquare, StickyNote } from 'lucide-react';
 import { evaluateCandidate, parseResume, generateJobDescription, transcribeAudioNote, quickSummarize } from '../services/geminiService';
 import LiveAgent from '../components/LiveAgent';
 import { Type, FunctionDeclaration } from "@google/genai";
@@ -52,7 +52,6 @@ const Recruiting: React.FC<RecruitingProps> = ({
   const [evaluatingIds, setEvaluatingIds] = useState<Set<string>>(new Set());
   const [activeInterview, setActiveInterview] = useState<Candidate | null>(null);
   const [emailNotification, setEmailNotification] = useState<string | null>(null);
-  const [selectedProfile, setSelectedProfile] = useState<CandidateProfile | null>(null);
 
   // Offer Modal State
   const [showOfferModal, setShowOfferModal] = useState(false);
@@ -96,9 +95,6 @@ const Recruiting: React.FC<RecruitingProps> = ({
   const [quickSummaries, setQuickSummaries] = useState<Record<string, string>>({});
 
   // Derived Filters
-  const departments = Array.from(new Set(jobs.map(j => j.department)));
-  const locations = Array.from(new Set(jobs.map(j => j.location).filter(Boolean)));
-
   const filteredJobs = jobs.filter(job => {
     const matchDept = !filterDepartment || job.department === filterDepartment;
     const matchLoc = !filterLocation || job.location === filterLocation;
@@ -124,9 +120,11 @@ const Recruiting: React.FC<RecruitingProps> = ({
     return (b.evaluation?.score || 0) - (a.evaluation?.score || 0);
   });
 
-  // Auto-Evaluation
+  // --- AUTOMATIC EVALUATION LOGIC ---
   useEffect(() => {
+    // Detect candidates who are 'applied' but not yet evaluated
     const unevaluatedCandidates = candidates.filter(c => c.status === 'applied' && !evaluatingIds.has(c.id));
+    
     if (unevaluatedCandidates.length > 0) {
       unevaluatedCandidates.forEach(candidate => {
         handleAutoEvaluate(candidate);
@@ -135,20 +133,39 @@ const Recruiting: React.FC<RecruitingProps> = ({
   }, [candidates, evaluatingIds]); 
 
   const handleAutoEvaluate = async (candidate: Candidate) => {
+    if (evaluatingIds.has(candidate.id)) return;
+
     setEvaluatingIds(prev => new Set(prev).add(candidate.id));
-    const job = jobs.find(j => j.id === candidate.jobId) || jobs.find(j => j.title === candidate.role);
-    const description = job ? job.description : "Standard job requirements.";
     
+    // Fallback logic to find job description
+    const job = jobs.find(j => j.id === candidate.jobId) || jobs.find(j => j.title === candidate.role);
+    const description = job ? job.description : "Standard job requirements for this role.";
+    
+    // Construct robust context from candidate profile
+    const context = `
+      Experience: ${candidate.experience || 'Not specified'}
+      Education: ${candidate.education || 'Not specified'}
+      Summary: ${candidate.resumeSummary || candidate.profile?.bio || 'No summary'}
+    `;
+
     try {
-      await new Promise(r => setTimeout(r, Math.random() * 2000 + 1000));
-      const evaluation = await evaluateCandidate(
-        `Experience: ${candidate.experience}. Education: ${candidate.education}. Resume: ${candidate.resumeSummary}`,
-        description
-      );
+      // Simulate "thinking" time for better UX perception
+      await new Promise(r => setTimeout(r, 1500));
+      
+      const evaluation = await evaluateCandidate(context, description);
+      
+      // Determine new status based on score
+      // Score >= 85 auto-promotes to 'shortlisted', otherwise 'evaluated'
       const newStatus = evaluation.score >= 85 ? 'shortlisted' : 'evaluated';
-      onUpdateCandidate({ ...candidate, status: newStatus, evaluation: evaluation });
+      
+      onUpdateCandidate({ 
+        ...candidate, 
+        status: newStatus, 
+        evaluation: evaluation 
+      });
+
     } catch (error) {
-      console.error(error);
+      console.error("Auto-evaluation failed", error);
     } finally {
       setEvaluatingIds(prev => {
         const next = new Set(prev);
@@ -157,6 +174,7 @@ const Recruiting: React.FC<RecruitingProps> = ({
       });
     }
   };
+  // ---------------------------------
 
   const handlePostJob = (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,7 +249,7 @@ const Recruiting: React.FC<RecruitingProps> = ({
       experience: newCandidateForm.experience,
       education: newCandidateForm.education,
       resumeSummary: newCandidateForm.resumeSummary,
-      status: 'applied'
+      status: 'applied' // This will trigger the Auto-Evaluation Effect
     };
     onAddCandidate(candidate);
     setShowAddCandidate(false);
@@ -383,7 +401,9 @@ const Recruiting: React.FC<RecruitingProps> = ({
         <LiveAgent 
            agentName="Alex (Recruiter)"
            roleDescription={`Talent Acquisition Specialist interviewing ${activeInterview.name}.`}
-           systemInstruction={`You are Alex, a professional recruiter... (Same instructions)`}
+           systemInstruction={`You are Alex, a professional recruiter interviewing ${activeInterview.name} for the role of ${activeInterview.role}. 
+           Start by welcoming them warmly. Ask about their experience in ${activeInterview.experience}. 
+           Be professional but friendly. If the candidate seems good, suggest sending a technical assessment.`}
            voiceName="Kore"
            tools={[{ functionDeclarations: [emailTool] }]}
            toolImplementations={{ sendEmail: sendEmailImplementation }}
@@ -417,7 +437,6 @@ const Recruiting: React.FC<RecruitingProps> = ({
       </div>
 
       {activeTab === 'jobs' ? (
-        // ... (Existing Job Board UI - No changes needed here, assuming kept from previous context)
         <div className="animate-fade-in space-y-6">
            <div className="flex justify-end mb-4">
                <button onClick={() => setShowPostJob(true)} className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium shadow-lg"><Plus size={18} /> Post Job</button>
@@ -436,7 +455,7 @@ const Recruiting: React.FC<RecruitingProps> = ({
               ))}
            </div>
            
-           {/* Post Job Modal (Simplified for brevity as it was existing) */}
+           {/* Post Job Modal */}
            {showPostJob && (
              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                 <div className="bg-slate-900 border border-slate-700 p-8 rounded-2xl max-w-lg w-full">
@@ -444,7 +463,17 @@ const Recruiting: React.FC<RecruitingProps> = ({
                    <form onSubmit={handlePostJob} className="space-y-4">
                       <input value={newJob.title} onChange={e => setNewJob({...newJob, title: e.target.value})} placeholder="Title" className="w-full bg-slate-800 rounded-lg p-3 text-white" />
                       <input value={newJob.department} onChange={e => setNewJob({...newJob, department: e.target.value})} placeholder="Department" className="w-full bg-slate-800 rounded-lg p-3 text-white" />
-                      <textarea value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} placeholder="Description" className="w-full bg-slate-800 rounded-lg p-3 text-white h-32" />
+                      <div className="relative">
+                         <textarea value={newJob.description} onChange={e => setNewJob({...newJob, description: e.target.value})} placeholder="Description" className="w-full bg-slate-800 rounded-lg p-3 text-white h-32" />
+                         <button 
+                           type="button" 
+                           onClick={handleGenerateDescription}
+                           disabled={isGeneratingDesc}
+                           className="absolute right-2 bottom-2 text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded flex items-center gap-1"
+                         >
+                           {isGeneratingDesc ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} AI Generate
+                         </button>
+                      </div>
                       <div className="flex gap-4">
                          <button type="button" onClick={() => setShowPostJob(false)} className="flex-1 py-3 text-slate-400">Cancel</button>
                          <button type="submit" className="flex-1 py-3 bg-green-600 text-white rounded-lg font-bold">Post Job</button>
@@ -463,7 +492,14 @@ const Recruiting: React.FC<RecruitingProps> = ({
           {sortedCandidates.map(candidate => (
             <div key={candidate.id} className="bg-slate-800 border border-slate-700 rounded-xl p-6 transition-all hover:border-slate-600 relative overflow-hidden">
                {/* Status Badge */}
-               <div className="absolute top-0 right-0 p-4">
+               <div className="absolute top-0 right-0 p-4 flex flex-col gap-2 items-end">
+                  {/* Visual Indicator for AI Processing */}
+                  {evaluatingIds.has(candidate.id) && (
+                     <span className="bg-purple-500/20 text-purple-400 px-3 py-1 rounded-lg text-xs font-bold border border-purple-500/30 flex items-center gap-1 animate-pulse">
+                        <Sparkles size={12}/> AI Analyzing...
+                     </span>
+                  )}
+
                   {candidate.status === 'offer_pending' && <span className="bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-lg text-xs font-bold border border-yellow-500/30 flex items-center gap-1"><FileSignature size={12}/> Offer Approval Pending</span>}
                   {candidate.status === 'offer_sent' && <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-lg text-xs font-bold border border-blue-500/30 flex items-center gap-1"><Mail size={12}/> Offer Sent</span>}
                   {candidate.status === 'offer_accepted' && <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-lg text-xs font-bold border border-green-500/30 flex items-center gap-1"><CheckCircle size={12}/> Offer Accepted</span>}
@@ -485,9 +521,33 @@ const Recruiting: React.FC<RecruitingProps> = ({
                       <span className="text-slate-500 block text-xs uppercase tracking-wide mb-1">Experience</span> {candidate.experience}
                     </div>
                     <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-700/50">
-                       <span className="text-slate-500 block text-xs uppercase tracking-wide mb-1">Resume Summary</span>
-                       {candidate.resumeSummary}
+                       <span className="text-slate-500 block text-xs uppercase tracking-wide mb-1 flex items-center gap-2">
+                         Resume Summary 
+                         <button onClick={() => handleQuickSummary(candidate.id, candidate.resumeSummary)} className="text-blue-400 hover:text-white">
+                           {quickSummaryId === candidate.id ? <Loader2 size={10} className="animate-spin" /> : <Zap size={10} />}
+                         </button>
+                       </span>
+                       {quickSummaries[candidate.id] || candidate.resumeSummary}
                     </div>
+                  </div>
+
+                  {/* VOICE NOTE UI */}
+                  <div className="mt-4 flex items-center gap-3">
+                     <button 
+                       onClick={isRecording ? stopRecording : startRecording}
+                       className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                         isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-700 text-slate-300 hover:text-white'
+                       }`}
+                     >
+                       {isRecording ? <MicOff size={12} /> : <Mic size={12} />}
+                       {isRecording ? 'Stop Recording' : 'Add Voice Note'}
+                     </button>
+                     {isTranscribing && <span className="text-xs text-blue-400 flex items-center gap-1"><Loader2 size={12} className="animate-spin"/> Transcribing...</span>}
+                     {voiceNoteText && (
+                        <div className="flex-1 bg-yellow-500/10 border border-yellow-500/30 p-2 rounded text-xs text-yellow-200 italic truncate">
+                           <StickyNote size={12} className="inline mr-1"/> "{voiceNoteText}"
+                        </div>
+                     )}
                   </div>
                 </div>
 
@@ -497,7 +557,9 @@ const Recruiting: React.FC<RecruitingProps> = ({
                      <div className="space-y-2">
                         <div className="flex justify-between items-center mb-2">
                            <span className="text-slate-400">Score</span>
-                           <span className={`text-xl font-bold ${candidate.evaluation && candidate.evaluation.score >= 85 ? 'text-green-400' : 'text-slate-200'}`}>{candidate.evaluation?.score || 0}</span>
+                           <span className={`text-xl font-bold ${candidate.evaluation && candidate.evaluation.score >= 85 ? 'text-green-400' : 'text-slate-200'}`}>
+                              {candidate.evaluation ? candidate.evaluation.score : <Loader2 size={16} className="animate-spin text-slate-500" />}
+                           </span>
                         </div>
                         <button onClick={() => handleStatusChange(candidate, 'shortlisted')} className="w-full py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg">Shortlist</button>
                         <button onClick={() => handleManualEmail(candidate, 'rejection')} className="w-full py-2 border border-slate-600 text-slate-400 hover:text-white rounded-lg">Reject</button>
@@ -552,6 +614,50 @@ const Recruiting: React.FC<RecruitingProps> = ({
               </div>
             </div>
           ))}
+
+          {/* Add Candidate Modal */}
+          {showAddCandidate && (
+             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <div className="bg-slate-900 border border-slate-700 p-8 rounded-2xl max-w-lg w-full">
+                   <h3 className="text-2xl font-bold text-white mb-6">Add New Candidate</h3>
+                   
+                   <div className="mb-6 space-y-2">
+                     <label className="block text-sm text-slate-400">Parse Resume (Paste Text)</label>
+                     <div className="relative">
+                        <textarea 
+                          value={rawResume} 
+                          onChange={e => setRawResume(e.target.value)} 
+                          className="w-full bg-slate-800 rounded-lg p-3 text-white text-xs h-24 font-mono"
+                          placeholder="Paste resume text here for auto-fill..."
+                        />
+                        <button 
+                          onClick={handleParseResume} 
+                          disabled={isParsing || !rawResume}
+                          className="absolute right-2 bottom-2 text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded flex items-center gap-1 disabled:opacity-50"
+                        >
+                          {isParsing ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />} Auto-Fill
+                        </button>
+                     </div>
+                   </div>
+
+                   <form onSubmit={handleAddCandidate} className="space-y-4 border-t border-slate-800 pt-4">
+                      <input required value={newCandidateForm.name} onChange={e => setNewCandidateForm({...newCandidateForm, name: e.target.value})} placeholder="Full Name" className="w-full bg-slate-800 rounded-lg p-3 text-white" />
+                      <select required value={newCandidateForm.role} onChange={e => setNewCandidateForm({...newCandidateForm, role: e.target.value})} className="w-full bg-slate-800 rounded-lg p-3 text-white">
+                         <option value="">Select Role/Job</option>
+                         {jobs.map(j => <option key={j.id} value={j.title}>{j.title}</option>)}
+                      </select>
+                      <input value={newCandidateForm.experience} onChange={e => setNewCandidateForm({...newCandidateForm, experience: e.target.value})} placeholder="Experience (e.g. 5 Years)" className="w-full bg-slate-800 rounded-lg p-3 text-white" />
+                      <input value={newCandidateForm.education} onChange={e => setNewCandidateForm({...newCandidateForm, education: e.target.value})} placeholder="Education" className="w-full bg-slate-800 rounded-lg p-3 text-white" />
+                      <textarea value={newCandidateForm.resumeSummary} onChange={e => setNewCandidateForm({...newCandidateForm, resumeSummary: e.target.value})} placeholder="Professional Summary" className="w-full bg-slate-800 rounded-lg p-3 text-white h-20" />
+                      
+                      <div className="flex gap-4">
+                         <button type="button" onClick={() => setShowAddCandidate(false)} className="flex-1 py-3 text-slate-400">Cancel</button>
+                         <button type="submit" className="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold">Add Candidate</button>
+                      </div>
+                   </form>
+                </div>
+             </div>
+          )}
 
           {/* Offer Modal */}
           {showOfferModal && offerCandidate && (

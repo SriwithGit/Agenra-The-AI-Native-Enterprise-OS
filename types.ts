@@ -73,6 +73,7 @@ export interface Tenant {
   adminEmail: string;
   services: ModuleType[];
   billing: BillingInfo;
+  isServiceSuspended?: boolean; // New field for automatic pausing
   supportTickets: SupportTicket[];
   serviceRequests: ServiceRequest[];
 }

@@ -13,7 +13,8 @@ import Billing from './views/Billing';
 import UserManagement from './views/UserManagement';
 import ITAM from './views/ITAM';
 import CustomerService from './views/CustomerService';
-import { LayoutDashboard, Headset, Users, PieChart, Search, Briefcase, Globe, LogOut, Shield, Building2, User as UserIcon, Lock, CreditCard, ChevronDown, Monitor, Wifi, WifiOff, RefreshCw, CheckCircle2, ArrowLeftRight, ExternalLink } from 'lucide-react';
+import GlobalChatbot from './components/GlobalChatbot';
+import { LayoutDashboard, Headset, Users, PieChart, Search, Briefcase, Globe, LogOut, Shield, Building2, User as UserIcon, Lock, CreditCard, ChevronDown, Monitor, Wifi, WifiOff, RefreshCw, CheckCircle2, ArrowLeftRight, ExternalLink, Loader2, AlertTriangle } from 'lucide-react';
 import { api } from './services/api';
 
 // --- MOCK DATA FALLBACKS ---
@@ -88,7 +89,7 @@ function App() {
 
   // System State
   const [backendStatus, setBackendStatus] = useState<'connected' | 'local_mode'>('connected');
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(true);
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeModule, setActiveModule] = useState<ModuleType>(ModuleType.DASHBOARD);
@@ -110,7 +111,7 @@ function App() {
   const [csSimulationTenantId, setCsSimulationTenantId] = useState<string>('agenra');
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
 
-  // --- Initial Data Load ---
+  // --- Initial Data Load & Auto-Suspension Logic ---
   useEffect(() => {
     const init = async () => {
       setIsSyncing(true);
@@ -118,16 +119,26 @@ function App() {
         const [fetchedTenants, fetchedUsers, fetchedAssets] = await Promise.all([
            api.getTenants(),
            api.getUsers(),
-           api.getAssets('tenant-A')
+           api.getAssets('') // Fetch ALL assets initially to handle multi-tenancy in demo
         ]);
-        setTenants(fetchedTenants);
+        
+        // AUTOMATIC SERVICE SUSPENSION LOGIC
+        // If billing is overdue, force suspend status.
+        const processedTenants = fetchedTenants.map(t => {
+          if (t.billing.status === 'overdue' && !t.isServiceSuspended) {
+            return { ...t, isServiceSuspended: true };
+          }
+          return t;
+        });
+
+        setTenants(processedTenants);
         setUsers(fetchedUsers);
         setAssets(fetchedAssets);
         setBackendStatus('local_mode');
       } catch (e) {
         console.error("Initialization failed", e);
       } finally {
-        setIsSyncing(false);
+        setTimeout(() => setIsSyncing(false), 1500); // Artificial delay for polish
       }
     };
     init();
@@ -276,6 +287,7 @@ function App() {
         setCandidates(prev => prev.map(c => c.id === req.candidateId ? { ...c, itamStatus: 'provisioned' } : c));
      }
   };
+  const handleAddITPolicy = (policy: ITPolicy) => setItPolicies(prev => [...prev, policy]);
 
   const handleHireCandidate = async (candidate: Candidate) => {
     const newUser = await api.createUser({
@@ -327,7 +339,12 @@ function App() {
 
   const handlePayBill = (tenantId: string) => {
     setTenants(prev => prev.map(t => {
-      if (t.id === tenantId) return { ...t, billing: { ...t.billing, amountDue: 0, status: 'active' } };
+      // Automatically resume services when bill is paid
+      if (t.id === tenantId) return { 
+        ...t, 
+        billing: { ...t.billing, amountDue: 0, status: 'active' },
+        isServiceSuspended: false 
+      };
       return t;
     }));
   };
@@ -377,21 +394,63 @@ function App() {
   const getFilteredUsers = () => currentUser?.role === 'SUPERUSER' ? users : users.filter(u => u.tenantId === currentUser?.tenantId);
   const getPreboardingCandidates = () => getFilteredCandidates().filter(c => c.status === 'offer_accepted' || c.status === 'onboarding_progress' || c.status === 'onboarding_completed');
   const getFilteredAuditLogs = () => currentUser?.role === 'SUPERUSER' ? auditLogs : auditLogs.filter(log => log.tenantId === currentUser?.tenantId);
+  
+  // NEW: Filter Assets to ensure multi-tenancy privacy
+  const getFilteredAssets = () => currentUser?.role === 'SUPERUSER' ? assets : assets.filter(a => a.tenantId === currentUser?.tenantId);
 
+  // --- Access Control Logic ---
   const canAccess = (module: ModuleType) => {
     if (!currentUser) return false;
     if (module === ModuleType.JOB_BOARD) return true; 
+
+    // Access Logic with Suspension Check
     if (currentUser.permissions.includes(module)) {
       if (currentUser.role !== 'SUPERUSER' && currentUser.tenantId) {
+         // Check Suspension Status
+         const userTenant = tenants.find(t => t.id === currentUser.tenantId);
+         const isSuspended = userTenant?.isServiceSuspended;
+         
+         // If Suspended, BLOCK all functional modules except Billing and Dashboard
+         if (isSuspended && module !== ModuleType.BILLING && module !== ModuleType.DASHBOARD && module !== ModuleType.USER_MANAGEMENT) {
+            return false;
+         }
+
          if (module === ModuleType.BILLING) return true;
          if (module === ModuleType.USER_MANAGEMENT) return true;
-         const userTenant = tenants.find(t => t.id === currentUser.tenantId);
+         
          if (userTenant && !userTenant.services.includes(module)) return false; 
       }
       return true;
     }
     return false;
   };
+
+  // --- Loading Screen ---
+  if (isSyncing) {
+     return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-white space-y-6">
+           <div className="relative">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-blue-600 to-purple-600 animate-pulse blur-lg absolute"></div>
+              <div className="w-20 h-20 rounded-2xl bg-slate-900 border border-slate-700 relative flex items-center justify-center z-10">
+                 <span className="text-3xl font-bold bg-gradient-to-tr from-blue-400 to-purple-400 bg-clip-text text-transparent">A</span>
+              </div>
+           </div>
+           <div className="flex flex-col items-center gap-2">
+              <h1 className="text-xl font-bold tracking-widest">AGENRA CORE</h1>
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
+                 <Loader2 className="animate-spin" size={12} /> INITIALIZING SYSTEM MODULES
+              </div>
+           </div>
+           <div className="w-64 h-1 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full bg-blue-500 animate-progress-indeterminate"></div>
+           </div>
+        </div>
+     );
+  }
+
+  // Check suspension status for UI Banner
+  const currentTenant = tenants.find(t => t.id === currentUser?.tenantId);
+  const isSuspended = currentTenant?.isServiceSuspended;
 
   // --- Main Render Logic ---
   const renderContent = () => {
@@ -473,7 +532,15 @@ function App() {
         if (currentUser.role === 'SUPERUSER') return <GlobalBilling tenants={tenants} />; // Legacy catch, though routing might handle above
         return <Billing tenant={tenants.find(t => t.id === currentUser.tenantId)!} onPayBill={handlePayBill} onRequestServiceChange={handleRequestServiceChange} />;
       case ModuleType.ITAM:
-         return <ITAM assets={assets} requests={itRequests} policies={itPolicies} onAddAsset={handleAddAsset} onUpdateAsset={handleUpdateAsset} onResolveRequest={handleResolveRequest} />;
+         return <ITAM 
+           assets={getFilteredAssets()} 
+           requests={itRequests} 
+           policies={itPolicies} 
+           onAddAsset={handleAddAsset} 
+           onUpdateAsset={handleUpdateAsset} 
+           onResolveRequest={handleResolveRequest}
+           onAddPolicy={handleAddITPolicy}
+         />;
       default:
         if (currentUser.role === 'SUPERUSER') return (
           <SuperuserDashboard 
@@ -587,6 +654,14 @@ function App() {
     <div className="flex flex-col h-screen bg-slate-900 text-slate-200 overflow-hidden relative">
       <BrowserBar currentUrl={currentDomain} onChangeUrl={handleDomainChange} tenants={tenants} />
       
+      {/* SERVICE SUSPENSION BANNER */}
+      {isSuspended && currentUser.role !== 'SUPERUSER' && (
+        <div className="bg-red-600 text-white px-4 py-2 text-center text-sm font-bold flex items-center justify-center gap-2 animate-pulse z-50">
+          <AlertTriangle size={16} />
+          SERVICES PAUSED: Account is overdue. Please settle invoice in Billing to resume access.
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
          <div className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col shrink-0">
          <div className="p-6 border-b border-slate-800">
@@ -621,8 +696,10 @@ function App() {
                <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all text-sm"><LogOut size={14} /> Sign Out</button>
          </div>
          </div>
-         <main className="flex-1 overflow-auto bg-slate-900">
-         <div className="p-8 pb-20">{renderContent()}</div>
+         <main className="flex-1 overflow-auto bg-slate-900 relative">
+            <div className="p-8 pb-20">{renderContent()}</div>
+            {/* Global Chatbot */}
+            <GlobalChatbot activeModule={activeModule} />
          </main>
       </div>
     </div>

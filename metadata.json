@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Sri: One for All",
+  "name": "Agenra: One for All",
   "description": "An enterprise orchestration engine utilizing Gemini 2.5 Live API for voice agents in Customer Service and Recruiting, alongside Search Grounding for Market Research and Finance.",
   "requestFramePermissions": [
     "microphone"

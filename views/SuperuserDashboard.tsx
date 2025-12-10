@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Tenant, ModuleType, SupportTicket, ServiceRequest, User, Job } from '../types';
-import { Building2, CreditCard, Ticket, Settings, Check, X, Shield, Mail, AlertCircle, Plus, Trash2, BrainCircuit, Sparkles, Loader2, FileText, Inbox, TrendingUp, Calendar, AlertTriangle, Globe, User as UserIcon, Terminal as TerminalIcon, Command, ChevronRight, Server, Database, Activity, PieChart, BarChart as BarChartIcon } from 'lucide-react';
+import { Building2, CreditCard, Ticket, Settings, Check, X, Shield, Mail, AlertCircle, Plus, Trash2, BrainCircuit, Sparkles, Loader2, FileText, Inbox, TrendingUp, Calendar, AlertTriangle, Globe, User as UserIcon, Terminal as TerminalIcon, Command, ChevronRight, Server, Database, Activity, PieChart, BarChart as BarChartIcon, PauseCircle, PlayCircle } from 'lucide-react';
 import { analyzeSupportTickets } from '../services/geminiService';
 import { api } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
@@ -17,12 +17,15 @@ interface SuperuserDashboardProps {
   initialSelectedTenantId?: string | null;
 }
 
+// Only list "Add-on" services here. Core services like Billing/Dashboard are excluded from provisioning UI.
 const ALL_SERVICES = [
   { id: ModuleType.CUSTOMER_SERVICE, label: 'Customer Service' },
   { id: ModuleType.RECRUITING, label: 'Recruiting' },
   { id: ModuleType.FINANCE, label: 'Finance' },
   { id: ModuleType.MARKET_RESEARCH, label: 'Market Research' },
   { id: ModuleType.HR_INTERNAL, label: 'HR Internal' },
+  { id: ModuleType.ITAM, label: 'IT Asset Management' },
+  { id: ModuleType.USER_MANAGEMENT, label: 'User Management' },
 ];
 
 const SERVICE_COSTS: Partial<Record<ModuleType, number>> = {
@@ -31,10 +34,13 @@ const SERVICE_COSTS: Partial<Record<ModuleType, number>> = {
   [ModuleType.FINANCE]: 40000,
   [ModuleType.MARKET_RESEARCH]: 30000,
   [ModuleType.HR_INTERNAL]: 25000,
+  [ModuleType.ITAM]: 20000,
+  [ModuleType.USER_MANAGEMENT]: 10000,
   [ModuleType.BILLING]: 0,
+  [ModuleType.DASHBOARD]: 0,
 };
 
-const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
+const CHART_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4'];
 
 // --- ANALYTICS COMPONENT ---
 const GlobalAnalytics: React.FC<{ tenants: Tenant[], users: User[], jobs: Job[] }> = ({ tenants, users, jobs }) => {
@@ -42,7 +48,7 @@ const GlobalAnalytics: React.FC<{ tenants: Tenant[], users: User[], jobs: Job[] 
   const serviceStats = ALL_SERVICES.map(service => ({
     name: service.label,
     count: tenants.filter(t => t.services.includes(service.id)).length
-  }));
+  })).filter(s => s.count > 0);
 
   // 2. Revenue by Tenant
   const revenueData = tenants.map(t => ({
@@ -178,6 +184,9 @@ export const GlobalBilling: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
       <div className="space-y-6">
         {tenants.map(tenant => {
            const projected = tenant.services.reduce((s, service) => s + (SERVICE_COSTS[service] || 0), 0);
+           // Filter out Billing/Dashboard from list
+           const displayServices = tenant.services.filter(s => ALL_SERVICES.find(as => as.id === s));
+
            return (
              <div key={tenant.id} className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
                 <div className="p-6 border-b border-slate-700 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/30">
@@ -190,6 +199,9 @@ export const GlobalBilling: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
                            {tenant.name}
                            {tenant.billing.status === 'overdue' && (
                               <span className="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">Overdue</span>
+                           )}
+                           {tenant.isServiceSuspended && (
+                              <span className="text-[10px] bg-red-600 text-white px-1.5 py-0.5 rounded uppercase font-bold tracking-wider">SUSPENDED</span>
                            )}
                          </h3>
                          <div className="text-sm text-slate-500">ID: {tenant.id}</div>
@@ -212,13 +224,13 @@ export const GlobalBilling: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
                 <div className="p-6">
                    <h4 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Service Breakdown</h4>
                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {tenant.services.map(service => (
+                      {displayServices.map(service => (
                         <div key={service} className="flex justify-between items-center p-3 bg-slate-900 rounded-lg border border-slate-800">
-                           <span className="text-slate-300 text-sm">{ALL_SERVICES.find(s => s.id === service)?.label}</span>
-                           <span className="text-slate-500 font-mono text-sm">₹{SERVICE_COSTS[service]}</span>
+                           <span className="text-slate-300 text-sm">{ALL_SERVICES.find(s => s.id === service)?.label || service}</span>
+                           <span className="text-slate-500 font-mono text-sm">₹{(SERVICE_COSTS[service] !== undefined ? SERVICE_COSTS[service] : 0)}</span>
                         </div>
                       ))}
-                      {tenant.services.length === 0 && <div className="text-slate-500 italic text-sm">No active services</div>}
+                      {displayServices.length === 0 && <div className="text-slate-500 italic text-sm">No billable services active</div>}
                    </div>
                 </div>
              </div>
@@ -230,7 +242,7 @@ export const GlobalBilling: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
 };
 
 // --- SYSTEM CONSOLE COMPONENT ---
-
+// ... (System Console implementation remains unchanged) ...
 const SystemConsole: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
   const [history, setHistory] = useState<string[]>([' Agenra v2.5.0 System Console', ' Type "help" for available commands.', '']);
   const [command, setCommand] = useState('');
@@ -304,7 +316,7 @@ const SystemConsole: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
       default:
         if (cmd.trim()) output = [` Command not found: ${main}`];
         break;
-    }
+      }
 
     setHistory(prev => [...prev, `> ${cmd}`, ...output, '']);
   };
@@ -421,6 +433,11 @@ const SuperuserDashboard: React.FC<SuperuserDashboardProps> = ({ tenants, users,
   const projectedBill = activeTenant 
     ? activeTenant.services.reduce((acc, curr) => acc + (SERVICE_COSTS[curr] || 0), 0) 
     : 0;
+  
+  // Only show services that are in ALL_SERVICES (excludes Billing/Dashboard)
+  const activeTenantDisplayServices = activeTenant 
+    ? activeTenant.services.filter(s => ALL_SERVICES.find(as => as.id === s)) 
+    : [];
 
   const toggleService = (tenant: Tenant, serviceId: ModuleType) => {
     const hasService = tenant.services.includes(serviceId);
@@ -481,6 +498,21 @@ const SuperuserDashboard: React.FC<SuperuserDashboardProps> = ({ tenants, users,
         initialServices: has ? prev.initialServices.filter(s => s !== serviceId) : [...prev.initialServices, serviceId]
       };
     });
+  };
+
+  // --- Service Suspension Handlers ---
+  const handleForceResume = (tenant: Tenant) => {
+     onUpdateTenant({ ...tenant, isServiceSuspended: false });
+     setNotification(`Explicitly resumed services for ${tenant.name}.`);
+     setTimeout(() => setNotification(null), 3000);
+  };
+
+  const handleSuspendServices = (tenant: Tenant) => {
+     if (confirm(`Are you sure you want to suspend services for ${tenant.name}? This will block user access immediately.`)) {
+        onUpdateTenant({ ...tenant, isServiceSuspended: true });
+        setNotification(`Services suspended for ${tenant.name}.`);
+        setTimeout(() => setNotification(null), 3000);
+     }
   };
 
   return (
@@ -652,15 +684,19 @@ const SuperuserDashboard: React.FC<SuperuserDashboardProps> = ({ tenants, users,
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${
                     selectedTenantId === tenant.id ? 'bg-blue-500 text-white' : 
-                    tenant.billing.status === 'overdue' ? 'bg-red-500 text-white' : 'bg-slate-900 text-slate-500'
+                    tenant.isServiceSuspended ? 'bg-red-500 text-white' : 
+                    tenant.billing.status === 'overdue' ? 'bg-orange-500 text-white' : 'bg-slate-900 text-slate-500'
                   }`}>
-                    {tenant.billing.status === 'overdue' ? <AlertCircle size={20} /> : <Building2 size={20} />}
+                    {tenant.isServiceSuspended ? <PauseCircle size={20} /> : (tenant.billing.status === 'overdue' ? <AlertCircle size={20} /> : <Building2 size={20} />)}
                   </div>
                   <div>
                     <div className="font-bold flex items-center gap-2">
                       {tenant.name}
-                      {tenant.billing.status === 'overdue' && (
-                        <span className="text-[10px] bg-red-500 text-white px-1.5 rounded uppercase font-bold tracking-wider">Overdue</span>
+                      {tenant.isServiceSuspended && (
+                        <span className="text-[10px] bg-red-600 text-white px-1.5 rounded uppercase font-bold tracking-wider">Suspended</span>
+                      )}
+                      {!tenant.isServiceSuspended && tenant.billing.status === 'overdue' && (
+                        <span className="text-[10px] bg-orange-500 text-white px-1.5 rounded uppercase font-bold tracking-wider">Overdue</span>
                       )}
                     </div>
                     <div className="text-xs opacity-70 flex gap-1 items-center"><Globe size={10} /> {tenant.domain || 'No Domain'}</div>
@@ -701,23 +737,60 @@ const SuperuserDashboard: React.FC<SuperuserDashboardProps> = ({ tenants, users,
                       <div className="text-xs text-blue-400 font-medium">{activeTenant.domain}</div>
                     </div>
                   </div>
+                  
+                  {/* Suspension Override Panel */}
+                  <div className="px-6 py-4 bg-slate-900 border-b border-slate-700 flex justify-between items-center">
+                     <div>
+                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Service Status</div>
+                        {activeTenant.isServiceSuspended ? (
+                           <div className="flex items-center gap-2 text-red-400 font-bold">
+                              <PauseCircle size={16} /> 
+                              SUSPENDED (Payment Action Required)
+                           </div>
+                        ) : (
+                           <div className="flex items-center gap-2 text-green-400 font-bold">
+                              <Check size={16} /> 
+                              ACTIVE
+                           </div>
+                        )}
+                     </div>
+                     <div>
+                        {activeTenant.isServiceSuspended ? (
+                           <button 
+                             onClick={() => handleForceResume(activeTenant)}
+                             className="px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg hover:shadow-green-500/20"
+                           >
+                              <PlayCircle size={16} /> Force Resume Services
+                           </button>
+                        ) : (
+                           <button 
+                             onClick={() => handleSuspendServices(activeTenant)}
+                             className="px-4 py-2 bg-red-600/10 text-red-400 border border-red-500/20 hover:bg-red-600 hover:text-white rounded-lg text-sm font-bold flex items-center gap-2"
+                           >
+                              <PauseCircle size={16} /> Suspend Services
+                           </button>
+                        )}
+                     </div>
+                  </div>
+
                   <div className="p-6">
                     <div className="space-y-3">
                       {ALL_SERVICES.map(service => {
                         const isActive = activeTenant.services.includes(service.id);
                         return (
-                          <div key={service.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-600 transition-all">
+                          <div key={service.id} className={`flex items-center justify-between p-4 rounded-xl border border-slate-800 transition-all ${activeTenant.isServiceSuspended ? 'bg-slate-900/50 opacity-50 grayscale' : 'bg-slate-900 hover:border-slate-600'}`}>
                             <div className="flex items-center gap-3">
                               <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]' : 'bg-slate-600'}`}></div>
                               <span className={`font-medium ${isActive ? 'text-white' : 'text-slate-500'}`}>{service.label}</span>
                             </div>
                             <button
+                              disabled={activeTenant.isServiceSuspended}
                               onClick={() => toggleService(activeTenant, service.id)}
                               className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${
                                 isActive 
                                   ? 'bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500 hover:text-white' 
                                   : 'bg-green-500/10 text-green-400 border border-green-500/20 hover:bg-green-500 hover:text-white'
-                              }`}
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
                             >
                               {isActive ? (
                                 <>
@@ -788,22 +861,22 @@ const SuperuserDashboard: React.FC<SuperuserDashboardProps> = ({ tenants, users,
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700 bg-slate-800/50">
-                        {activeTenant.services.map(serviceId => (
+                        {activeTenantDisplayServices.map(serviceId => (
                           <tr key={serviceId} className="hover:bg-slate-700/30 transition-colors">
                             <td className="p-3 text-white">
-                              {ALL_SERVICES.find(s => s.id === serviceId)?.label}
+                              {ALL_SERVICES.find(s => s.id === serviceId)?.label || serviceId}
                             </td>
                             <td className="p-3 font-mono text-slate-300">
-                              ₹{SERVICE_COSTS[serviceId]}
+                              ₹{(SERVICE_COSTS[serviceId] !== undefined ? SERVICE_COSTS[serviceId] : 0)}
                             </td>
                             <td className="p-3">
                               <span className="text-xs bg-green-500/10 text-green-400 px-2 py-0.5 rounded border border-green-500/20">Active</span>
                             </td>
                           </tr>
                         ))}
-                        {activeTenant.services.length === 0 && (
+                        {activeTenantDisplayServices.length === 0 && (
                           <tr>
-                            <td colSpan={3} className="p-4 text-center text-slate-500 italic">No active services</td>
+                            <td colSpan={3} className="p-4 text-center text-slate-500 italic">No billable services active</td>
                           </tr>
                         )}
                       </tbody>

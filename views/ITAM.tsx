@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { Asset, ITRequest, ITPolicy, AssetStatus, AssetType } from '../types';
-import { Laptop, Box, CheckCircle, Clock, AlertTriangle, Search, Plus, FileText, User, Settings, RefreshCw, Smartphone, Monitor } from 'lucide-react';
+import { Laptop, Box, CheckCircle, Clock, AlertTriangle, Search, Plus, FileText, User, Settings, RefreshCw, Smartphone, Monitor, Sparkles, Loader2 } from 'lucide-react';
+import { generateITPolicy } from '../services/geminiService';
 
 interface ITAMProps {
   assets: Asset[];
@@ -10,15 +11,21 @@ interface ITAMProps {
   onAddAsset: (asset: Asset) => void;
   onUpdateAsset: (asset: Asset) => void;
   onResolveRequest: (requestId: string, assetId?: string) => void;
+  onAddPolicy: (policy: ITPolicy) => void;
 }
 
-const ITAM: React.FC<ITAMProps> = ({ assets, requests, policies, onAddAsset, onUpdateAsset, onResolveRequest }) => {
+const ITAM: React.FC<ITAMProps> = ({ assets, requests, policies, onAddAsset, onUpdateAsset, onResolveRequest, onAddPolicy }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'inventory' | 'requests' | 'policies'>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   
   // Asset Modal State
   const [showAssetModal, setShowAssetModal] = useState(false);
   const [newAsset, setNewAsset] = useState<Partial<Asset>>({ type: 'HARDWARE', status: 'AVAILABLE', location: 'HQ' });
+
+  // Policy Generation State
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [policyType, setPolicyType] = useState('Acceptable Use Policy (AUP)');
+  const [isGeneratingPolicy, setIsGeneratingPolicy] = useState(false);
 
   const filteredAssets = assets.filter(a => 
     a.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -67,6 +74,26 @@ const ITAM: React.FC<ITAMProps> = ({ assets, requests, policies, onAddAsset, onU
     }
     // 2. Resolve Request
     onResolveRequest(request.id, assetId);
+  };
+
+  const handleGeneratePolicy = async () => {
+    setIsGeneratingPolicy(true);
+    try {
+      const content = await generateITPolicy(policyType);
+      const newPolicy: ITPolicy = {
+        id: Math.random().toString(36).substr(2, 9),
+        title: policyType,
+        content: content,
+        lastUpdated: new Date().toISOString().split('T')[0]
+      };
+      onAddPolicy(newPolicy);
+      setShowPolicyModal(false);
+    } catch (error) {
+      console.error(error);
+      alert("Failed to generate policy.");
+    } finally {
+      setIsGeneratingPolicy(false);
+    }
   };
 
   return (
@@ -252,24 +279,34 @@ const ITAM: React.FC<ITAMProps> = ({ assets, requests, policies, onAddAsset, onU
       )}
 
       {activeTab === 'policies' && (
-         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {policies.map(policy => (
-               <div key={policy.id} className="bg-slate-800 p-6 rounded-2xl border border-slate-700 hover:border-blue-500/50 transition-all">
-                  <div className="flex items-center gap-3 mb-4">
-                     <div className="p-3 bg-slate-700 rounded-xl text-slate-300">
-                        <FileText size={24} />
-                     </div>
-                     <div>
-                        <h3 className="text-lg font-bold text-white">{policy.title}</h3>
-                        <div className="text-xs text-slate-500">Updated: {policy.lastUpdated}</div>
-                     </div>
-                  </div>
-                  <p className="text-slate-400 text-sm leading-relaxed border-t border-slate-700 pt-4">
-                     {policy.content}
-                  </p>
-               </div>
-            ))}
-         </div>
+         <>
+          <div className="flex justify-end mb-4">
+            <button 
+              onClick={() => setShowPolicyModal(true)}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl font-bold shadow-lg transition-all"
+            >
+               <Sparkles size={18} /> Generate Policy with AI
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {policies.map(policy => (
+                <div key={policy.id} className="bg-slate-800 p-6 rounded-2xl border border-slate-700 hover:border-blue-500/50 transition-all">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="p-3 bg-slate-700 rounded-xl text-slate-300">
+                          <FileText size={24} />
+                      </div>
+                      <div>
+                          <h3 className="text-lg font-bold text-white">{policy.title}</h3>
+                          <div className="text-xs text-slate-500">Updated: {policy.lastUpdated}</div>
+                      </div>
+                    </div>
+                    <div className="text-slate-400 text-sm leading-relaxed border-t border-slate-700 pt-4 whitespace-pre-wrap max-h-60 overflow-y-auto custom-scrollbar">
+                      {policy.content}
+                    </div>
+                </div>
+              ))}
+          </div>
+         </>
       )}
 
       {/* Create Asset Modal */}
@@ -301,6 +338,55 @@ const ITAM: React.FC<ITAMProps> = ({ assets, requests, policies, onAddAsset, onU
                     <button type="submit" className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold">Add to Inventory</button>
                  </div>
               </form>
+           </div>
+        </div>
+      )}
+
+      {/* Generate Policy Modal */}
+      {showPolicyModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+           <div className="bg-slate-900 border border-slate-700 p-8 rounded-2xl max-w-md w-full">
+              <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                 <Sparkles className="text-purple-400" /> Generate Policy
+              </h3>
+              <p className="text-slate-400 text-sm mb-6">Create comprehensive IT policies tailored for Indian enterprises.</p>
+              
+              <div className="space-y-4">
+                 <div>
+                    <label className="block text-sm text-slate-400 mb-1">Select Policy Type</label>
+                    <select 
+                       value={policyType} 
+                       onChange={(e) => setPolicyType(e.target.value)}
+                       className="w-full bg-slate-800 rounded-lg p-3 text-white border border-slate-700 focus:ring-2 focus:ring-purple-500"
+                    >
+                       <option>Acceptable Use Policy (AUP)</option>
+                       <option>Data Security & Privacy</option>
+                       <option>Bring Your Own Device (BYOD)</option>
+                       <option>Remote Access Policy</option>
+                       <option>Incident Response Plan</option>
+                       <option>Password Policy</option>
+                    </select>
+                 </div>
+                 
+                 <div className="flex gap-3 pt-4">
+                    <button 
+                       type="button" 
+                       onClick={() => setShowPolicyModal(false)} 
+                       className="flex-1 py-2 text-slate-400"
+                       disabled={isGeneratingPolicy}
+                    >
+                       Cancel
+                    </button>
+                    <button 
+                       onClick={handleGeneratePolicy} 
+                       disabled={isGeneratingPolicy}
+                       className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-bold flex items-center justify-center gap-2"
+                    >
+                       {isGeneratingPolicy ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                       {isGeneratingPolicy ? 'Drafting...' : 'Generate'}
+                    </button>
+                 </div>
+              </div>
            </div>
         </div>
       )}

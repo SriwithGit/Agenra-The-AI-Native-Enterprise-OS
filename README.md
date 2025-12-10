@@ -4,6 +4,7 @@
 
 Agenra is a unified SaaS platform that consolidates HR, Finance, Recruiting, and Customer Support into a single operating system. It leverages the full suite of **Google Gemini Models (2.5 Flash, 3.0 Pro, and Live API)** to transform static business data into active intelligence.
 
+![Agenra Banner](https://via.placeholder.com/1200x600/0f172a/3b82f6?text=Agenra+AI+Orchestration)
 
 ## 🚀 Key Features
 
