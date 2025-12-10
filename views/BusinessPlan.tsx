@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { Download, TrendingUp, Target, Shield, Globe, DollarSign, Award, ChevronRight, Building2, Users, IndianRupee } from 'lucide-react';
+import { Download, Target, Globe, Award, ChevronRight, IndianRupee } from 'lucide-react';
 
 const BusinessPlan: React.FC = () => {
   const handlePrint = () => {

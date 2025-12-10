@@ -1,9 +1,23 @@
+
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { GroundingChunk, Tenant, CandidateProfile, Job } from "../types";
 import { base64ToUint8Array, decodeAudioData } from "../utils/audioUtils";
 
 const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
+
+// Singleton AudioContext to prevent browser limit errors (max 6 contexts)
+let ttsAudioContext: AudioContext | null = null;
+
+const getAudioContext = () => {
+  if (!ttsAudioContext) {
+    ttsAudioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+  }
+  if (ttsAudioContext.state === 'suspended') {
+    ttsAudioContext.resume();
+  }
+  return ttsAudioContext;
+};
 
 // Helper to strip markdown formatting from JSON responses
 const cleanJson = (text: string): string => {
@@ -40,7 +54,7 @@ export const generateSpeech = async (text: string): Promise<void> => {
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Fenrir' },
+            prebuiltVoiceConfig: { voiceName: 'Kore' }, // Changed to Kore (Female, Neutral)
           },
         },
       },
@@ -49,17 +63,17 @@ export const generateSpeech = async (text: string): Promise<void> => {
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!base64Audio) return;
 
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+    const ctx = getAudioContext();
     const audioBuffer = await decodeAudioData(
       base64ToUint8Array(base64Audio),
-      audioContext,
+      ctx,
       24000,
       1
     );
 
-    const source = audioContext.createBufferSource();
+    const source = ctx.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(audioContext.destination);
+    source.connect(ctx.destination);
     source.start();
 
   } catch (error) {

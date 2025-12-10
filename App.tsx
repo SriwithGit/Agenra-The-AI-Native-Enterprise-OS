@@ -25,7 +25,7 @@ const INITIAL_JOBS: Job[] = [
     title: 'Senior React Developer',
     department: 'Engineering',
     location: 'Bengaluru, KA',
-    description: 'Looking for 5+ years experience in React, TypeScript, and Node.js. Hybrid role.',
+    description: 'Looking for 5+ years experience in React, TypeScript, and Node.js. Hybrid role. Must have experience with scalable architecture and leading small teams.',
     postedDate: '2024-03-10',
     applicants: 12
   },
@@ -50,9 +50,43 @@ const INITIAL_CANDIDATES: Candidate[] = [
     role: 'Senior React Developer',
     experience: '6 years at Infosys & Startups',
     education: 'B.Tech CS, IIT Delhi',
-    resumeSummary: 'Full stack developer with focus on frontend performance and scalable systems.',
+    resumeSummary: 'Full stack developer with focus on frontend performance and scalable systems. Expert in React, Node.js, and Cloud Architecture.',
     status: 'offer_pending', 
-    offerDetails: { salary: '15,00,000', joiningDate: '2024-05-01', variablePay: '10%', notes: 'Strong candidate, good cultural fit', draftedBy: 'hr-recruiting' }
+    offerDetails: { salary: '15,00,000', joiningDate: '2024-05-01', variablePay: '10%', notes: 'Strong candidate, good cultural fit', draftedBy: 'hr-recruiting' },
+    evaluation: { score: 92, reasoning: 'Perfect match for seniority and stack.', fit: 'High', keySkills: ['React', 'Node.js', 'System Design'] }
+  },
+  {
+    id: 'c2',
+    tenantId: 'tenant-A',
+    jobId: '1',
+    name: 'Ananya Gupta',
+    role: 'Senior React Developer',
+    experience: '5 years at TechM',
+    education: 'M.Tech, BITS Pilani',
+    resumeSummary: 'Senior Software Engineer specializing in MERN stack. Led a team of 4 developers. Certified AWS Solution Architect with strong TypeScript background.',
+    status: 'applied' // High Match - Will trigger AI Analysis
+  },
+  {
+    id: 'c3',
+    tenantId: 'tenant-A',
+    jobId: '1',
+    name: 'Vikram Singh',
+    role: 'Senior React Developer',
+    experience: '8 years at LegacyCorp',
+    education: 'B.E. Mechanical',
+    resumeSummary: 'Experienced Java Backend Developer with 8 years in Spring Boot. Recently completed a React Udemy course and looking to switch domains to frontend.',
+    status: 'applied' // Pivot/Medium Match - Will trigger AI Analysis
+  },
+  {
+    id: 'c4',
+    tenantId: 'tenant-A',
+    jobId: '1',
+    name: 'Rohan Mehta',
+    role: 'Senior React Developer',
+    experience: '2 years at WebSolutions',
+    education: 'BCA, Bangalore Univ',
+    resumeSummary: 'Junior frontend developer passionate about UI libraries. Experienced in HTML, CSS, and basic React hooks. Looking for a senior role to grow.',
+    status: 'applied' // Low Match - Will trigger AI Analysis
   }
 ];
 
@@ -699,7 +733,12 @@ function App() {
          <main className="flex-1 overflow-auto bg-slate-900 relative">
             <div className="p-8 pb-20">{renderContent()}</div>
             {/* Global Chatbot */}
-            <GlobalChatbot activeModule={activeModule} />
+            <GlobalChatbot 
+              activeModule={activeModule} 
+              currentUser={currentUser}
+              currentTenant={tenants.find(t => t.id === currentUser.tenantId)}
+              onNavigate={(module) => setActiveModule(module)} 
+            />
          </main>
       </div>
     </div>

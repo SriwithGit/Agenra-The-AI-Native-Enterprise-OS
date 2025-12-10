@@ -1,10 +1,11 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Tenant, ModuleType, SupportTicket, ServiceRequest, User, Job } from '../types';
-import { Building2, CreditCard, Ticket, Settings, Check, X, Shield, Mail, AlertCircle, Plus, Trash2, BrainCircuit, Sparkles, Loader2, FileText, Inbox, TrendingUp, Calendar, AlertTriangle, Globe, User as UserIcon, Terminal as TerminalIcon, Command, ChevronRight, Server, Database, Activity, PieChart, BarChart as BarChartIcon, PauseCircle, PlayCircle } from 'lucide-react';
+import { Building2, CreditCard, Ticket, Settings, Check, X, Shield, Mail, AlertCircle, Plus, Trash2, BrainCircuit, Sparkles, Loader2, FileText, Inbox, TrendingUp, Calendar, AlertTriangle, Globe, User as UserIcon, Terminal as TerminalIcon, Command, ChevronRight, Server, Database, Activity, PieChart, BarChart as BarChartIcon, PauseCircle, PlayCircle, ScrollText } from 'lucide-react';
 import { analyzeSupportTickets } from '../services/geminiService';
 import { api } from '../services/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RePieChart, Pie, Cell, Legend } from 'recharts';
+import BusinessPlan from './BusinessPlan';
 
 interface SuperuserDashboardProps {
   tenants: Tenant[];
@@ -224,10 +225,10 @@ export const GlobalBilling: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
                 <div className="p-6">
                    <h4 className="text-sm font-bold text-slate-400 mb-3 uppercase tracking-wider">Service Breakdown</h4>
                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {displayServices.map(service => (
-                        <div key={service} className="flex justify-between items-center p-3 bg-slate-900 rounded-lg border border-slate-800">
-                           <span className="text-slate-300 text-sm">{ALL_SERVICES.find(s => s.id === service)?.label || service}</span>
-                           <span className="text-slate-500 font-mono text-sm">₹{(SERVICE_COSTS[service] !== undefined ? SERVICE_COSTS[service] : 0)}</span>
+                      {displayServices.map(serviceId => (
+                        <div key={serviceId} className="flex justify-between items-center p-3 bg-slate-900 rounded-lg border border-slate-800">
+                           <span className="text-slate-300 text-sm">{ALL_SERVICES.find(s => s.id === serviceId)?.label || serviceId}</span>
+                           <span className="text-slate-500 font-mono text-sm">₹{(SERVICE_COSTS[serviceId] !== undefined ? SERVICE_COSTS[serviceId] : 0)}</span>
                         </div>
                       ))}
                       {displayServices.length === 0 && <div className="text-slate-500 italic text-sm">No billable services active</div>}
@@ -242,7 +243,6 @@ export const GlobalBilling: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
 };
 
 // --- SYSTEM CONSOLE COMPONENT ---
-// ... (System Console implementation remains unchanged) ...
 const SystemConsole: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
   const [history, setHistory] = useState<string[]>([' Agenra v2.5.0 System Console', ' Type "help" for available commands.', '']);
   const [command, setCommand] = useState('');
@@ -400,7 +400,7 @@ const SystemConsole: React.FC<{ tenants: Tenant[] }> = ({ tenants }) => {
 const SuperuserDashboard: React.FC<SuperuserDashboardProps> = ({ tenants, users, jobs, onUpdateTenant, onApproveRequest, onCreateTenant, onDeleteTenant, initialSelectedTenantId }) => {
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(initialSelectedTenantId || null);
   const [notification, setNotification] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'console'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'analytics' | 'console' | 'strategy'>('overview');
   
   // Update selection if prop changes (e.g., navigation from Overview)
   useEffect(() => {
@@ -544,6 +544,12 @@ const SuperuserDashboard: React.FC<SuperuserDashboardProps> = ({ tenants, users,
            >
              <TerminalIcon size={16} /> System Console
            </button>
+           <button 
+             onClick={() => setActiveTab('strategy')} 
+             className={`px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 transition-all whitespace-nowrap ${activeTab === 'strategy' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+           >
+             <ScrollText size={16} /> Master Strategy
+           </button>
         </div>
       </div>
 
@@ -561,6 +567,8 @@ const SuperuserDashboard: React.FC<SuperuserDashboardProps> = ({ tenants, users,
       {activeTab === 'console' && <SystemConsole tenants={tenants} />}
       
       {activeTab === 'analytics' && <GlobalAnalytics tenants={tenants} users={users} jobs={jobs} />}
+
+      {activeTab === 'strategy' && <BusinessPlan />}
 
       {activeTab === 'overview' && (
         <>
